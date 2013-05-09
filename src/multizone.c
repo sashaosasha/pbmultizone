@@ -43,6 +43,36 @@ void line_layer_update_callback(Layer *me, GContext* ctx) {
   graphics_draw_line(ctx, GPoint(x0, y+1), GPoint(x0+width, y+1));
 }
 
+int day_of_week(int y, int m, int d)
+{
+   static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+   y -= m < 3;
+   return (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+}
+
+int nth_date(int y, int m, int dow, int nth_week)
+{
+    int target_date = 1;
+    int first_dow = day_of_week(y, m, target_date);
+    while (first_dow != dow)
+    {
+        first_dow = (first_dow + 1) % 7;
+        ++target_date;
+    }
+    target_date += (nth_week - 1) * 7;
+    return target_date;
+}
+
+bool is_usa_dst(PblTm* time)
+{
+    if (time->tm_mon > 3 && time->tm_mon < 11)
+        return true;
+    if (time->tm_mon == 3)
+        return time->tm_mday >= nth_date(time->tm_year, 3, 0, 2);
+    if (time->tm_mon == 11)
+        return time->tm_mday < nth_date(time->tm_year, 11, 0, 2);
+    return false;
+}
 
 // Called once per second
 void handle_second_tick(AppContextRef ctx, PebbleTickEvent *t) {
@@ -58,7 +88,7 @@ void handle_second_tick(AppContextRef ctx, PebbleTickEvent *t) {
   PblTm currentTime;
   get_time(&currentTime);
 
-  int offset = currentTime.tm_isdst ? 5 : 6;  // TODO: How do we not assume CST/CDT here?
+  int offset = is_usa_dst(&currentTime) ? 5 : 6;  // TODO: How do we not assume CST/CDT here?
   int offsets[] = {offset, offset + 8, offset + 4};
 
   const char* time_format = clock_is_24h_style() ? "%H:%M:%S" : "%I:%M:%S";
